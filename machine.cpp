@@ -183,6 +183,8 @@ void Machine::setDriveImage(int drive, char const * filename, int cylinders, int
   if (filename) {
     m_diskFilename[drive] = strdup(filename);
     m_disk[drive] = FileBrowser(m_baseDir).openFile(filename, "r+b");
+    if (m_disk[drive] == nullptr)
+      m_disk[drive] = FileBrowser(m_baseDir).openFile(filename, "rb");
     if (m_disk[drive]) {
 
       // get image file size

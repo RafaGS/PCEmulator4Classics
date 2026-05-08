@@ -390,11 +390,7 @@ init_crtc_loop:
 
 ; If disk boot failed or sector is not bootable, fall back to ROM BASIC (INT 18h)
   jc   boot_failed
-  cmp  word [es:0x7dfe], 0xaa55
-  jne  boot_failed
-
 ; Jump to boot sector
-
   jmp  0:0x7c00
 
 boot_failed:

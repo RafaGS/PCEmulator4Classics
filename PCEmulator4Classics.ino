@@ -268,10 +268,34 @@ bool autoDetectDisks(char const ** diskFilename)
             s[strlen(s) - 1] = 0;
             ++s;
           }
-          strncpy(foundNamesBuf[i], s, sizeof(foundNamesBuf[i]) - 1);
-          foundNamesBuf[i][sizeof(foundNamesBuf[i]) - 1] = 0;
-          diskFilename[i] = foundNamesBuf[i];
-          if (i == 0 || i == 2) hasBootableDisk = true;
+          // Accept shell-escaped filenames in TXT files, eg:
+          //   COMPAQ\ -\ DOS\ Version\ 1.10.img
+          // and convert them to literal SD filenames.
+          char normalized[256];
+          int w = 0;
+          for (int r = 0; s[r] && w < (int)sizeof(normalized) - 1; ++r) {
+            if (s[r] == '\\' && s[r + 1])
+              ++r;
+            normalized[w++] = s[r];
+          }
+          normalized[w] = 0;
+
+          // Normalize optional leading '/': FileBrowser expects SD-root relative path.
+          char * normalizedPath = normalized;
+          while (*normalizedPath == '/')
+            ++normalizedPath;
+
+          // Use TXT value only if target exists.
+          if (normalizedPath[0] && fb.exists(normalizedPath, false)) {
+            strncpy(foundNamesBuf[i], normalizedPath, sizeof(foundNamesBuf[i]) - 1);
+            foundNamesBuf[i][sizeof(foundNamesBuf[i]) - 1] = 0;
+            diskFilename[i] = foundNamesBuf[i];
+            if (i == 0 || i == 2) hasBootableDisk = true;
+          } else if (fb.exists(diskNames[i], false)) {
+            // TXT present but invalid/stale: fallback to canonical A.img/B.img/C.img/D.img
+            diskFilename[i] = diskNames[i];
+            if (i == 0 || i == 2) hasBootableDisk = true;
+          }
         }
         fclose(f);
       }
@@ -410,11 +434,11 @@ void setup()
 
   // Show which disks were found
   String foundDisks = "Found disk images:\n";
-  const char * diskLabels[DISKCOUNT] = { "A: (fd0)", "B: (fd1)", "C: (hd0)", "D: (hd1)" };
+  const char * diskLabels2[DISKCOUNT] = { "A: (fd0)", "B: (fd1)", "C: (hd0)", "D: (hd1)" };
   int foundCount = 0;
   for (int i = 0; i < DISKCOUNT; ++i) {
     if (diskFilename[i]) {
-      foundDisks += diskLabels[i];
+      foundDisks += diskLabels2[i];
       foundDisks += " - ";
       foundDisks += diskFilename[i];
       foundDisks += "\n";

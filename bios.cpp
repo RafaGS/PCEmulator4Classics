@@ -81,7 +81,16 @@ void BIOS::init(Machine * machine)
   memcpy(m_memory + BIOS_ROM_LOAD_ADDR, bios_identity_rom, sizeof(bios_identity_rom));
 #endif
 
-  // Reset vector always points to the custom BIOS (overwrites any vector in the identity ROM).
+  memcpy(m_memory + 0xfe012, BIOS_COPYRIGHT, strlen(BIOS_COPYRIGHT) + 1);
+  // BIOS_REVISION_TAG can be up to 10 chars (e.g. "J   COMPAQ").
+  // Write WITHOUT null terminator: 0xFFFE6 + 10 = 0xFFFF0 = reset vector!
+  memcpy(m_memory + 0xfffe6, BIOS_REVISION_TAG, strlen(BIOS_REVISION_TAG));
+  memcpy(m_memory + 0xffff5, BIOS_OEM_DATE, 8);
+  m_memory[0xffffe] = BIOS_MACHINE_ID;
+  m_memory[0xfffff] = BIOS_ROM_CHECKSUM;
+  // Reset vector MUST be written last: BIOS_REVISION_TAG write above can reach
+  // 0xFFFF0 if the tag is 10 chars (e.g. "J   COMPAQ" + nul = 11 bytes would
+  // corrupt the first byte of the JMP instruction).
   m_memory[0xffff0] = 0xea;
   m_memory[0xffff1] = BIOS_OFF & 0xff;
   m_memory[0xffff2] = BIOS_OFF >> 8;
@@ -91,6 +100,9 @@ void BIOS::init(Machine * machine)
 #if BIOS_HAS_ROM_BASIC
   loadRomBasic();
 #endif
+  // Note: for non-ROM-BASIC systems (Compaq, etc.), INT 18h is handled by
+  // bios.asm's int_table which points to int18: (iret).  boot_failed: in
+  // bios.asm calls INT 18h then HLT, which is correct behavior.
 
   // BIOS asm copies its own mem_top template (01/01/91, MODEL=AT) during POST.
   // Apply platform-specific identity here and again during runtime (helpersEntry).
@@ -102,6 +114,9 @@ void BIOS::reset()
 {
   m_kbdScancodeComp = 0;
   m_memory[BIOS_DATAAREA_ADDR + BIOS_NUMHD] = (bool)(m_machine->disk(2)) + (bool)(m_machine->disk(3));
+
+  m_memory[BIOS_DATAAREA_ADDR + 0x10] = BIOS_EQUIPMENT_WORD & 0xFF; // CHANGED
+  m_memory[BIOS_DATAAREA_ADDR + 0x11] = BIOS_EQUIPMENT_WORD >> 8; // CHANGED
   applyPlatformIdentity();
 }
 
@@ -966,8 +981,6 @@ void BIOS::diskHandler_floppy()
   int drive   = i8086::DL();
   int service = i8086::AH();
 
-  //printf("INT 13h, FDD (%d), service %02X\n", drive, service);
-
   if (m_machine->disk(drive) == nullptr) {
     // invalid drive
     diskHandler_floppyExit(0x80, true);
@@ -978,7 +991,9 @@ void BIOS::diskHandler_floppy()
 
     // Reset Diskette System
     case 0x00:
-      diskHandler_floppyExit(m_mediaType[drive] == mediaUnknown ? 0x06 : 0x00, true);
+      // Many DOS boot loaders issue AH=00 very early and expect success.
+      // Keep media probing separate from reset semantics.
+      diskHandler_floppyExit(0x00, true);
       return;
 
     // Read Diskette Status
@@ -1154,7 +1169,8 @@ void BIOS::diskHandler_floppy()
     // Set Media Type for Format
     case 0x18:
     {
-      // check if proposed media type matches with current
+      // Some OEM DOS boot paths probe AH=18 with values that don't exactly
+      // match our auto-detected geometry. Be permissive and provide INT 1Eh.
       int propTracks = i8086::CH();
       int propSPT    = i8086::CL();
       int tracks     = m_machine->diskCylinders(drive) - 1;
@@ -1165,9 +1181,10 @@ void BIOS::diskHandler_floppy()
         i8086::setES(BIOS_SEG);
         i8086::setDI(m_origInt1EAddr - BIOS_SEG * 16);
       } else {
-        // not supported
-        diskHandler_floppyExit(0x0c, true);
-        printf("  INT 13h, FDD, 18h: unsupported media type, t=%d (%d), s=%d (%d)\n", propTracks, tracks, propSPT, SPT);
+        // Return success with our current table instead of hard failing.
+        diskHandler_floppyExit(0x00, true);
+        i8086::setES(BIOS_SEG);
+        i8086::setDI(m_origInt1EAddr - BIOS_SEG * 16);
       }
       m_machine->resetDiskChanged(drive);
       return;
@@ -1196,8 +1213,16 @@ bool BIOS::diskHandler_calcAbsAddr(int drive, uint32_t * pos, uint32_t * dest, u
   int track  = i8086::CH() | (((uint16_t)i8086::CL() & 0xc0) << 2);
   int sector = i8086::CL() & 0x3f;
   int head   = i8086::DH();
-  if (sector > sectorsPerTrack)
+  if (sector < 1 || sector > sectorsPerTrack)
     return false;
+  if (drive < 2) {
+    // Keep floppy CHS checks strict.
+    int cylinders = m_machine->diskCylinders(drive);
+    if (head < 0 || head >= heads)
+      return false;
+    if (track < 0 || track >= cylinders)
+      return false;
+  }
   *pos   = 512 * ((track * heads + head) * sectorsPerTrack + (sector - 1));
   *dest  = i8086::ES() * 16 + i8086::BX();
   *count = i8086::AL() * 512;

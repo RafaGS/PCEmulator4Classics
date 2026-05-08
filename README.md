@@ -2,11 +2,13 @@
 
 ## Cambios realizados
 
-Esta es una versión modificada del emulador de PC de FabGL que ajusta su comportamiento al del IBM PC original.
+Esta es una versión modificada del emulador de PC de FabGL que ajusta su comportamiento al de los sistemas:
+- IBM PC original (modelo 5150).
+- Compaq Deskpro (model 1).
 
 ### Principales modificaciones:
 
-1. **Inserción de particularidades de BIOS original IBM PC model 5150**
+1. **Inserción de particularidades de BIOS originales**
    - Detectable por herramientas tipo Norton Utilities y PC Tools
 
 2. **Auto-detección de discos**

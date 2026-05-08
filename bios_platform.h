@@ -54,9 +54,11 @@
 
 #define BIOS_OEM_NAME               "IBM PC 5150"
 
-#define BIOS_OEM_DATE               "10/27/82"
-#define BIOS_MACHINE_ID             0xFFu
-#define BIOS_ROM_CHECKSUM           0x77u
+#define BIOS_OEM_DATE               "10/27/82"   /* off 0x1FF5, phys 0xFFFF5, bytes "10/27/82" // VERIFIED */
+#define BIOS_MACHINE_ID             0xFFu         /* off 0x1FFE, phys 0xFFFFE, byte 0xFF // VERIFIED */
+#define BIOS_ROM_CHECKSUM           0x77u         /* off 0x1FFF, phys 0xFFFFF, byte 0x77 // VERIFIED */
+#define BIOS_COPYRIGHT              "1501476 COPR. IBM 1982" /* off 0x0012, phys 0xFE012, OEM copyright string // VERIFIED */
+#define BIOS_REVISION_TAG           ""            /* off n/a, phys n/a, not used on this profile // VERIFIED */
 
 #define BIOS_CONVENTIONAL_RAM_KB 256u
 
@@ -76,37 +78,48 @@
 #define BIOS_EQUIPMENT_WORD         0x0061u
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Compaq Deskpro  (not yet implemented)
+   Compaq Deskpro Rev J  (02/27/87, 106265-002, 8 KB at F000:E000–FFFF)
    ═══════════════════════════════════════════════════════════════════════════ */
 #elif BIOS_VARIANT == BIOS_VARIANT_COMPAQ
+
+#define BIOS_ROM_LOAD_ADDR          0xFE000u
+
+#define BIOS_OEM_NAME               "Compaq Deskpro Rev J"
+
+#define BIOS_OEM_DATE               "02/27/87"   /* off 0x1FF5, phys 0xFFFF5, bytes "02/27/87" // VERIFIED */
+#define BIOS_MACHINE_ID             0xFEu         /* off 0x1FFE, phys 0xFFFFE, byte 0xFE // VERIFIED */
+#define BIOS_ROM_CHECKSUM           0x9Bu         /* off 0x1FFF, phys 0xFFFFF, byte 0x9B // VERIFIED */
+#define BIOS_COPYRIGHT              "CRJ (C)Copyright COMPAQ Computer Corp. 1982,83,84,85-All rights reserved." /* off 0x0012, phys 0xFE012, raw OEM copyright string // VERIFIED */
+#define BIOS_REVISION_TAG           "J   COMPAQ" /* off 0x1FE6, phys 0xFFFE6, raw bytes "J   COMPAQ" // VERIFIED */
+
 #define BIOS_CONVENTIONAL_RAM_KB 640u
-#error "BIOS_VARIANT_COMPAQ: bios_platform.h macros not yet defined.  Add a bios_compaq.h and fill in the platform block."
+
+/* No ROM BASIC on Compaq Deskpro Rev J (BASICA is disk-loaded). */
+#define BIOS_HAS_ROM_BASIC          0
+#define BIOS_ROM_BASIC_SEG          0x0000u
+
+/* INT 11h equipment word: no fixed literal write to 0040:0010 found in ROM analysis.
+   Use Compaq Deskpro default when runtime-computed. */
+#define BIOS_EQUIPMENT_WORD         0x4463u       /* off n/a, phys n/a, runtime-computed default // RUNTIME-COMPUTED */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Amstrad PC1512  (not yet implemented)
    ═══════════════════════════════════════════════════════════════════════════ */
 #elif BIOS_VARIANT == BIOS_VARIANT_AMSTRAD
+#define BIOS_ROM_LOAD_ADDR          BIOS_ADDR
+#define BIOS_OEM_NAME               "Amstrad PC1512"
+#define BIOS_OEM_DATE               ""
+#define BIOS_MACHINE_ID             0x00u
+#define BIOS_ROM_CHECKSUM           0x00u
+#define BIOS_COPYRIGHT              ""
+#define BIOS_REVISION_TAG           ""
 #define BIOS_CONVENTIONAL_RAM_KB 512u
+#define BIOS_HAS_ROM_BASIC          0
+#define BIOS_ROM_BASIC_SEG          0x0000u
+#define BIOS_EQUIPMENT_WORD         0x0000u
 #error "BIOS_VARIANT_AMSTRAD: bios_platform.h macros not yet defined.  Add a bios_amstrad.h and fill in the platform block."
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   DEFAULT  (FabGL custom BIOS — no identity overlay, no ROM BASIC)
-   ═══════════════════════════════════════════════════════════════════════════ */
 #else
-
-#define BIOS_ROM_LOAD_ADDR          BIOS_ADDR   /* unused for DEFAULT */
-
-#define BIOS_OEM_NAME               "FabGL PC"
-
-#define BIOS_OEM_DATE               "01/01/91"
-#define BIOS_MACHINE_ID             0xFCu
-#define BIOS_ROM_CHECKSUM           0x01u
-
-#define BIOS_CONVENTIONAL_RAM_KB    640u
-
-#define BIOS_HAS_ROM_BASIC          0
-
-/* Equipment word for a generic 1-floppy, 80×25 CGA machine */
-#define BIOS_EQUIPMENT_WORD         0x0021u
+#error "No platform defined. Edit bios_platform.h and uncomment one PLATFORM_ define."
 
 #endif
